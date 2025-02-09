@@ -7,6 +7,7 @@ import "core:os"
 import "core:slice"
 import "core:strings"
 import "geometry"
+import "math"
 import "texture"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
@@ -23,6 +24,7 @@ Renderer :: struct {
 	positions_buffer:   wgpu.Buffer,
 	colors_buffer:      wgpu.Buffer,
 	tex_coords_buffer:  wgpu.Buffer,
+	index_buffer:       wgpu.Buffer,
 	texture_bind_group: wgpu.BindGroup,
 	test_texture:       texture.Texture,
 }
@@ -81,6 +83,7 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	renderer.positions_buffer = create_buffer(quad.positions[:])
 	renderer.colors_buffer = create_buffer(quad.colors[:])
 	renderer.tex_coords_buffer = create_buffer(quad.tex_coords[:])
+	renderer.index_buffer = create_index_buffer(quad.indices[:])
 }
 
 start_drawing :: proc() {
@@ -152,8 +155,15 @@ draw :: proc() {
 		0,
 		renderer.texture_bind_group,
 	)
+	wgpu.RenderPassEncoderSetIndexBuffer(
+		draw_ctx.render_pass_encoder,
+		renderer.index_buffer,
+		.Uint16,
+		0,
+		wgpu.BufferGetSize(renderer.index_buffer),
+	)
 
-	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 6, 1, 0, 0)
+	wgpu.RenderPassEncoderDrawIndexed(draw_ctx.render_pass_encoder, 6, 1, 0, 0, 0)
 }
 
 finish_drawing :: proc() {
@@ -197,6 +207,27 @@ create_buffer :: proc(data: []f32) -> wgpu.Buffer {
 	buffer := wgpu.DeviceCreateBuffer(
 		renderer.device,
 		&wgpu.BufferDescriptor{size = u64(slice.size(data)), usage = {.CopyDst, .Vertex}},
+	)
+
+	wgpu.QueueWriteBuffer(
+		renderer.queue,
+		buffer,
+		0,
+		raw_data(data),
+		uint(wgpu.BufferGetSize(buffer)),
+	)
+
+	return buffer
+}
+
+@(private = "file")
+create_index_buffer :: proc(data: []u16) -> wgpu.Buffer {
+	buffer := wgpu.DeviceCreateBuffer(
+		renderer.device,
+		&wgpu.BufferDescriptor {
+			size = u64(math.ceil_to_multiple(slice.size(data), 4)),
+			usage = {.CopyDst, .Index},
+		},
 	)
 
 	wgpu.QueueWriteBuffer(
@@ -459,4 +490,3 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 
 	return out.device
 }
-

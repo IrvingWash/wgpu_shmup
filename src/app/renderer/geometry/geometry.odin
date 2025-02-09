@@ -1,9 +1,10 @@
 package sam_renderer_geometry
 
 Quad_Geometry :: struct {
-	positions:  [12]f32,
-	colors:     [18]f32,
-	tex_coords: [12]f32,
+	positions:  [8]f32,
+	colors:     [12]f32,
+	tex_coords: [8]f32,
+	indices:    [6]u16,
 }
 
 create_quad :: proc() -> Quad_Geometry {
@@ -14,17 +15,13 @@ create_quad :: proc() -> Quad_Geometry {
 		-0.5, -0.5,
 		0.5, -0.5,
 		0.5, 0.5,
-		0.5, 0.5,
 		-0.5, 0.5,
-		-0.5, -0.5,
 	}
 	// odinfmt: enable
 
 	
 	// odinfmt: disable
 	quad.colors = {
-		1, 1, 1,
-		1, 1, 1,
 		1, 1, 1,
 		1, 1, 1,
 		1, 1, 1,
@@ -38,12 +35,17 @@ create_quad :: proc() -> Quad_Geometry {
 		0, 1,
 		1, 1,
 		1, 0,
-		1, 0,
 		0, 0,
-		0, 1,
+	}
+	// odinfmt: enable
+
+	
+	// odinfmt: disable
+	quad.indices = {
+		0, 1, 2,
+		2, 3, 0,
 	}
 	// odinfmt: enable
 
 	return quad
 }
-
