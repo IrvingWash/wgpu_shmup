@@ -4,19 +4,22 @@ import "../window"
 import "base:runtime"
 import "core:fmt"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 @(private)
 Renderer :: struct {
-	surface:         wgpu.Surface,
-	clear_color:     wgpu.Color,
-	device:          wgpu.Device,
-	queue:           wgpu.Queue,
-	texture_format:  wgpu.TextureFormat,
-	render_pipeline: wgpu.RenderPipeline,
-	draw_ctx:        Maybe(Draw_Context),
+	surface:          wgpu.Surface,
+	clear_color:      wgpu.Color,
+	device:           wgpu.Device,
+	queue:            wgpu.Queue,
+	texture_format:   wgpu.TextureFormat,
+	render_pipeline:  wgpu.RenderPipeline,
+	draw_ctx:         Maybe(Draw_Context),
+	positions_buffer: wgpu.Buffer,
+	colors_buffer:    wgpu.Buffer,
 }
 
 @(private = "file")
@@ -58,6 +61,27 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 
 	// Render Pipeline
 	renderer.render_pipeline = create_render_pipeline()
+
+	// Geometry
+	// odinfmt: disable
+	positions := [?]f32{
+		-0.5, -0.5,
+		0.5, -0.5,
+		0, 0.5,
+	}
+	// odinfmt: enable
+
+	
+	// odinfmt: disable
+	colors := [?]f32{
+		1, 0, 0,
+		0, 1, 0,
+		0, 0, 1,
+	}
+	// odinfmt: enable
+
+	renderer.positions_buffer = create_buffer(positions[:])
+	renderer.colors_buffer = create_buffer(colors[:])
 }
 
 start_drawing :: proc() {
@@ -103,6 +127,20 @@ draw :: proc() {
 	}
 
 	wgpu.RenderPassEncoderSetPipeline(draw_ctx.render_pass_encoder, renderer.render_pipeline)
+	wgpu.RenderPassEncoderSetVertexBuffer(
+		draw_ctx.render_pass_encoder,
+		0,
+		renderer.positions_buffer,
+		0,
+		wgpu.BufferGetSize(renderer.positions_buffer),
+	)
+	wgpu.RenderPassEncoderSetVertexBuffer(
+		draw_ctx.render_pass_encoder,
+		1,
+		renderer.colors_buffer,
+		0,
+		wgpu.BufferGetSize(renderer.colors_buffer),
+	)
 
 	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 3, 1, 0, 0)
 }
@@ -139,6 +177,45 @@ destroy :: proc() {
 }
 
 @(private = "file")
+create_buffer :: proc(data: []f32) -> wgpu.Buffer {
+	buffer := wgpu.DeviceCreateBuffer(
+		renderer.device,
+		&wgpu.BufferDescriptor{size = u64(slice.size(data)), usage = {.CopyDst, .Vertex}},
+	)
+
+	wgpu.QueueWriteBuffer(
+		renderer.queue,
+		buffer,
+		0,
+		raw_data(data),
+		uint(wgpu.BufferGetSize(buffer)),
+	)
+
+	return buffer
+}
+
+@(private = "file")
+configure_surface :: proc "c" (width, height: u32) {
+	wgpu.SurfaceConfigure(
+		renderer.surface,
+		&wgpu.SurfaceConfiguration {
+			device = renderer.device,
+			usage = {.RenderAttachment},
+			width = width,
+			height = height,
+			format = renderer.texture_format,
+			alphaMode = .Auto,
+			presentMode = .Fifo,
+		},
+	)
+}
+
+@(private = "file")
+resize :: proc "c" (window: window.Window, width: i32, height: i32) {
+	configure_surface(u32(width), u32(height))
+}
+
+@(private = "file")
 // TODO: prepare_model?
 create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	shader_path := "src/app/shaders/shader.wgsl"
@@ -163,13 +240,41 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	)
 	defer wgpu.ShaderModuleRelease(shader_module)
 
+	buffer_layouts := [?]wgpu.VertexBufferLayout {
+		wgpu.VertexBufferLayout {
+			arrayStride = 2 * size_of(f32),
+			stepMode = .Vertex,
+			attributeCount = 1,
+			attributes = &wgpu.VertexAttribute {
+				format = .Float32x2,
+				offset = 0,
+				shaderLocation = 0,
+			},
+		},
+		wgpu.VertexBufferLayout {
+			arrayStride = 3 * size_of(f32),
+			stepMode = .Vertex,
+			attributeCount = 1,
+			attributes = &wgpu.VertexAttribute {
+				format = .Float32x3,
+				offset = 0,
+				shaderLocation = 1,
+			},
+		},
+	}
+
 	return wgpu.DeviceCreateRenderPipeline(
 		renderer.device,
 		&wgpu.RenderPipelineDescriptor {
-			vertex = wgpu.VertexState{module = shader_module, entryPoint = "vsMain"},
+			vertex = wgpu.VertexState {
+				module = shader_module,
+				entryPoint = "vsMain",
+				bufferCount = len(buffer_layouts),
+				buffers = raw_data(buffer_layouts[:]),
+			},
 			primitive = wgpu.PrimitiveState {
 				topology = .TriangleList,
-				cullMode = .None,
+				cullMode = .Back,
 				frontFace = .CCW,
 				stripIndexFormat = .Undefined,
 			},
@@ -271,26 +376,5 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 	)
 
 	return out.device
-}
-
-@(private = "file")
-configure_surface :: proc "c" (width, height: u32) {
-	wgpu.SurfaceConfigure(
-		renderer.surface,
-		&wgpu.SurfaceConfiguration {
-			device = renderer.device,
-			usage = {.RenderAttachment},
-			width = width,
-			height = height,
-			format = renderer.texture_format,
-			alphaMode = .Auto,
-			presentMode = .Fifo,
-		},
-	)
-}
-
-@(private = "file")
-resize :: proc "c" (window: window.Window, width: i32, height: i32) {
-	configure_surface(u32(width), u32(height))
 }
 
