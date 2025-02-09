@@ -50,22 +50,11 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	renderer.queue = wgpu.DeviceGetQueue(renderer.device)
 
 	// Surface Configuration
-	window_size := window.get_size()
-
 	renderer.texture_format = wgpu.TextureFormat.BGRA8Unorm
+	window_size := window.get_size()
+	configure_surface(window_size.width, window_size.height)
 
-	wgpu.SurfaceConfigure(
-		renderer.surface,
-		&wgpu.SurfaceConfiguration {
-			device = renderer.device,
-			usage = {.RenderAttachment},
-			width = window_size.width,
-			height = window_size.height,
-			format = renderer.texture_format,
-			alphaMode = .Auto,
-			presentMode = .Fifo,
-		},
-	)
+	window.set_resize_callback(resize)
 
 	// Render Pipeline
 	renderer.render_pipeline = create_render_pipeline()
@@ -282,5 +271,26 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 	)
 
 	return out.device
+}
+
+@(private = "file")
+configure_surface :: proc "c" (width, height: u32) {
+	wgpu.SurfaceConfigure(
+		renderer.surface,
+		&wgpu.SurfaceConfiguration {
+			device = renderer.device,
+			usage = {.RenderAttachment},
+			width = width,
+			height = height,
+			format = renderer.texture_format,
+			alphaMode = .Auto,
+			presentMode = .Fifo,
+		},
+	)
+}
+
+@(private = "file")
+resize :: proc "c" (window: window.Window, width: i32, height: i32) {
+	configure_surface(u32(width), u32(height))
 }
 

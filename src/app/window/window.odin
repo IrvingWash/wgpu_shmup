@@ -14,7 +14,7 @@ init :: proc(width, height: u32, title: string, fullscreen := false) {
 		panic("Failed to initialize GLFW")
 	}
 
-	glfw.WindowHint(glfw.RESIZABLE, false)
+	glfw.WindowHint(glfw.RESIZABLE, true)
 	glfw.WindowHint(glfw.CLIENT_API, glfw.NO_API)
 
 	raw_title := strings.clone_to_cstring(title)
@@ -53,5 +53,9 @@ window_should_close :: proc() -> bool {
 destroy :: proc() {
 	glfw.DestroyWindow(window)
 	glfw.Terminate()
+}
+
+set_resize_callback :: proc(cb: proc "c" (window: Window, width, height: i32)) {
+	glfw.SetFramebufferSizeCallback(window, cb)
 }
 
