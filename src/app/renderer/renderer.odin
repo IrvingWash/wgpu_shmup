@@ -6,20 +6,22 @@ import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import "geometry"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 @(private)
 Renderer :: struct {
-	surface:          wgpu.Surface,
-	clear_color:      wgpu.Color,
-	device:           wgpu.Device,
-	queue:            wgpu.Queue,
-	texture_format:   wgpu.TextureFormat,
-	render_pipeline:  wgpu.RenderPipeline,
-	draw_ctx:         Maybe(Draw_Context),
-	positions_buffer: wgpu.Buffer,
-	colors_buffer:    wgpu.Buffer,
+	surface:           wgpu.Surface,
+	clear_color:       wgpu.Color,
+	device:            wgpu.Device,
+	queue:             wgpu.Queue,
+	texture_format:    wgpu.TextureFormat,
+	render_pipeline:   wgpu.RenderPipeline,
+	draw_ctx:          Maybe(Draw_Context),
+	positions_buffer:  wgpu.Buffer,
+	colors_buffer:     wgpu.Buffer,
+	tex_coords_buffer: wgpu.Buffer,
 }
 
 @(private = "file")
@@ -63,31 +65,11 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	renderer.render_pipeline = create_render_pipeline()
 
 	// Geometry
-	// odinfmt: disable
-	positions := [?]f32{
-		-0.5, -0.5,
-		0.5, -0.5,
-		0.5, 0.5,
-		0.5, 0.5,
-		-0.5, 0.5,
-		-0.5, -0.5,
-	}
-	// odinfmt: enable
+	quad := geometry.create_quad()
 
-	
-	// odinfmt: disable
-	colors := [?]f32{
-		1, 0, 0,
-		0, 1, 0,
-		0, 0, 1,
-		0, 0, 1,
-		0, 1, 0,
-		1, 0, 0,
-	}
-	// odinfmt: enable
-
-	renderer.positions_buffer = create_buffer(positions[:])
-	renderer.colors_buffer = create_buffer(colors[:])
+	renderer.positions_buffer = create_buffer(quad.positions[:])
+	renderer.colors_buffer = create_buffer(quad.colors[:])
+	renderer.tex_coords_buffer = create_buffer(quad.tex_coords[:])
 }
 
 start_drawing :: proc() {
