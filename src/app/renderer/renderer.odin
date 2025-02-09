@@ -355,7 +355,7 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 			},
 			primitive = wgpu.PrimitiveState {
 				topology = .TriangleList,
-				cullMode = .None,
+				cullMode = .Back,
 				frontFace = .CCW,
 				stripIndexFormat = .Undefined,
 			},
@@ -459,3 +459,4 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 
 	return out.device
 }
+
