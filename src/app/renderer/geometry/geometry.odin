@@ -13,10 +13,10 @@ create_quad :: proc() -> Quad_Geometry {
 	quad.positions = {
 		-0.5, -0.5,
 		0.5, -0.5,
-		-0.5, 0.5,
-		-0.5, 0.5,
 		0.5, 0.5,
-		0.5, -0.5,
+		0.5, 0.5,
+		-0.5, 0.5,
+		-0.5, -0.5,
 	}
 	// odinfmt: enable
 
@@ -37,12 +37,13 @@ create_quad :: proc() -> Quad_Geometry {
 	quad.tex_coords = {
 		0, 1,
 		1, 1,
-		0, 0,
-		0, 0,
 		1, 0,
-		1, 1,
+		1, 0,
+		0, 0,
+		0, 1,
 	}
 	// odinfmt: enable
 
 	return quad
 }
+
