@@ -12,7 +12,7 @@ app: App
 
 init :: proc() {
 	window.init(WINDOW_WIDTH, WINDOW_HEIGHT, "Sam")
-	renderer.init()
+	renderer.init(window.get_window())
 	fps_manager.init(TARGET_FPS)
 }
 
