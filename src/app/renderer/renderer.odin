@@ -67,7 +67,10 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	positions := [?]f32{
 		-0.5, -0.5,
 		0.5, -0.5,
-		0, 0.5,
+		0.5, 0.5,
+		0.5, 0.5,
+		-0.5, 0.5,
+		-0.5, -0.5,
 	}
 	// odinfmt: enable
 
@@ -77,6 +80,9 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 		1, 0, 0,
 		0, 1, 0,
 		0, 0, 1,
+		0, 0, 1,
+		0, 1, 0,
+		1, 0, 0,
 	}
 	// odinfmt: enable
 
@@ -142,7 +148,7 @@ draw :: proc() {
 		wgpu.BufferGetSize(renderer.colors_buffer),
 	)
 
-	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 3, 1, 0, 0)
+	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 6, 1, 0, 0)
 }
 
 finish_drawing :: proc() {
