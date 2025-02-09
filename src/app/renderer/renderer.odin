@@ -62,7 +62,7 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	renderer.test_texture = texture.create(
 		renderer.device,
 		renderer.queue,
-		"src/app/textures/test_texture.png",
+		"src/app/textures/ship_blue.png",
 		.RGBA8Unorm,
 	)
 
@@ -175,4 +175,3 @@ destroy :: proc() {
 	wgpu.DeviceRelease(renderer.device)
 	wgpu.SurfaceRelease(renderer.surface)
 }
-

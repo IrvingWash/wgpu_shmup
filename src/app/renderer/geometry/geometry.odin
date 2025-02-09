@@ -11,10 +11,10 @@ create_quad :: proc() -> Quad_Geometry {
 	// odinfmt: disable
 	quad.vertices = {
 		// x, y,		r, g, b,	u, v
-		-0.5, -0.5,		1, 1, 1,	0, 1,
-		+0.5, -0.5,		1, 1, 1,	1, 1,
-		+0.5, +0.5,		1, 1, 1,	1, 0,
-		-0.5, +0.5,		1, 1, 1,	0, 0,
+		-0.1, -0.1,		1, 1, 1,	0, 1,
+		+0.1, -0.1,		1, 1, 1,	1, 1,
+		+0.1, +0.1,		1, 1, 1,	1, 0,
+		-0.1, +0.1,		1, 1, 1,	0, 0,
 	}
 	// odinfmt: enable
 
@@ -28,4 +28,3 @@ create_quad :: proc() -> Quad_Geometry {
 
 	return quad
 }
-
