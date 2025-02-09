@@ -15,9 +15,7 @@ Renderer :: struct {
 	texture_format:     wgpu.TextureFormat,
 	render_pipeline:    wgpu.RenderPipeline,
 	draw_ctx:           Maybe(Draw_Context),
-	positions_buffer:   wgpu.Buffer,
-	colors_buffer:      wgpu.Buffer,
-	tex_coords_buffer:  wgpu.Buffer,
+	vertex_buffer:      wgpu.Buffer,
 	index_buffer:       wgpu.Buffer,
 	texture_bind_group: wgpu.BindGroup,
 	test_texture:       texture.Texture,
@@ -74,9 +72,7 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	// Geometry
 	quad := geometry.create_quad()
 
-	renderer.positions_buffer = create_buffer(quad.positions[:])
-	renderer.colors_buffer = create_buffer(quad.colors[:])
-	renderer.tex_coords_buffer = create_buffer(quad.tex_coords[:])
+	renderer.vertex_buffer = create_buffer(quad.vertices[:])
 	renderer.index_buffer = create_index_buffer(quad.indices[:])
 }
 
@@ -126,23 +122,9 @@ draw :: proc() {
 	wgpu.RenderPassEncoderSetVertexBuffer(
 		draw_ctx.render_pass_encoder,
 		0,
-		renderer.positions_buffer,
+		renderer.vertex_buffer,
 		0,
-		wgpu.BufferGetSize(renderer.positions_buffer),
-	)
-	wgpu.RenderPassEncoderSetVertexBuffer(
-		draw_ctx.render_pass_encoder,
-		1,
-		renderer.colors_buffer,
-		0,
-		wgpu.BufferGetSize(renderer.colors_buffer),
-	)
-	wgpu.RenderPassEncoderSetVertexBuffer(
-		draw_ctx.render_pass_encoder,
-		2,
-		renderer.tex_coords_buffer,
-		0,
-		wgpu.BufferGetSize(renderer.tex_coords_buffer),
+		wgpu.BufferGetSize(renderer.vertex_buffer),
 	)
 	wgpu.RenderPassEncoderSetBindGroup(
 		draw_ctx.render_pass_encoder,
@@ -186,12 +168,11 @@ finish_drawing :: proc() {
 destroy :: proc() {
 	texture.destroy(renderer.test_texture)
 	wgpu.BindGroupRelease(renderer.texture_bind_group)
-	wgpu.BufferRelease(renderer.tex_coords_buffer)
-	wgpu.BufferRelease(renderer.colors_buffer)
-	wgpu.BufferRelease(renderer.positions_buffer)
+	wgpu.BufferRelease(renderer.vertex_buffer)
 	wgpu.RenderPipelineRelease(renderer.render_pipeline)
 	wgpu.SurfaceUnconfigure(renderer.surface)
 	wgpu.QueueRelease(renderer.queue)
 	wgpu.DeviceRelease(renderer.device)
 	wgpu.SurfaceRelease(renderer.surface)
 }
+

@@ -73,42 +73,6 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	)
 	defer wgpu.ShaderModuleRelease(shader_module)
 
-	buffer_layouts := [?]wgpu.VertexBufferLayout {
-		// Positions
-		wgpu.VertexBufferLayout {
-			arrayStride = 2 * size_of(f32),
-			stepMode = .Vertex,
-			attributeCount = 1,
-			attributes = &wgpu.VertexAttribute {
-				format = .Float32x2,
-				offset = 0,
-				shaderLocation = 0,
-			},
-		},
-		// Colors
-		wgpu.VertexBufferLayout {
-			arrayStride = 3 * size_of(f32),
-			stepMode = .Vertex,
-			attributeCount = 1,
-			attributes = &wgpu.VertexAttribute {
-				format = .Float32x3,
-				offset = 0,
-				shaderLocation = 1,
-			},
-		},
-		// Texture coordinates
-		wgpu.VertexBufferLayout {
-			arrayStride = 2 * size_of(f32),
-			stepMode = .Vertex,
-			attributeCount = 1,
-			attributes = &wgpu.VertexAttribute {
-				format = .Float32x2,
-				offset = 0,
-				shaderLocation = 2,
-			},
-		},
-	}
-
 	texture_bind_group_layout_entries := [?]wgpu.BindGroupLayoutEntry {
 		// Sampler
 		wgpu.BindGroupLayoutEntry {
@@ -163,14 +127,25 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	)
 	defer wgpu.PipelineLayoutRelease(pipeline_layout)
 
+	vertex_attributes := [?]wgpu.VertexAttribute {
+		wgpu.VertexAttribute{format = .Float32x2, offset = 0, shaderLocation = 0},
+		wgpu.VertexAttribute{format = .Float32x3, offset = 2 * size_of(f32), shaderLocation = 1},
+		wgpu.VertexAttribute{format = .Float32x2, offset = 5 * size_of(f32), shaderLocation = 2},
+	}
+
 	return wgpu.DeviceCreateRenderPipeline(
 		renderer.device,
 		&wgpu.RenderPipelineDescriptor {
 			vertex = wgpu.VertexState {
 				module = shader_module,
 				entryPoint = "vsMain",
-				bufferCount = len(buffer_layouts),
-				buffers = raw_data(buffer_layouts[:]),
+				bufferCount = 1,
+				buffers = &wgpu.VertexBufferLayout {
+					arrayStride = 7 * size_of(f32),
+					stepMode = .Vertex,
+					attributeCount = len(vertex_attributes),
+					attributes = raw_data(vertex_attributes[:]),
+				},
 			},
 			primitive = wgpu.PrimitiveState {
 				topology = .TriangleList,
@@ -299,3 +274,4 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 
 	return out.device
 }
+
