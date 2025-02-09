@@ -3,16 +3,20 @@ package sam_renderer
 import "../window"
 import "base:runtime"
 import "core:fmt"
+import "core:os"
+import "core:strings"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 @(private)
 Renderer :: struct {
-	surface:     wgpu.Surface,
-	clear_color: wgpu.Color,
-	device:      wgpu.Device,
-	queue:       wgpu.Queue,
-	draw_ctx:    Maybe(Draw_Context),
+	surface:         wgpu.Surface,
+	clear_color:     wgpu.Color,
+	device:          wgpu.Device,
+	queue:           wgpu.Queue,
+	texture_format:  wgpu.TextureFormat,
+	render_pipeline: wgpu.RenderPipeline,
+	draw_ctx:        Maybe(Draw_Context),
 }
 
 @(private = "file")
@@ -47,6 +51,9 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 
 	// Surface Configuration
 	window_size := window.get_size()
+
+	renderer.texture_format = wgpu.TextureFormat.BGRA8Unorm
+
 	wgpu.SurfaceConfigure(
 		renderer.surface,
 		&wgpu.SurfaceConfiguration {
@@ -54,18 +61,23 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 			usage = {.RenderAttachment},
 			width = window_size.width,
 			height = window_size.height,
-			format = .BGRA8Unorm,
+			format = renderer.texture_format,
 			alphaMode = .Auto,
 			presentMode = .Fifo,
 		},
 	)
+
+	// Render Pipeline
+	renderer.render_pipeline = create_render_pipeline()
 }
 
 start_drawing :: proc() {
+	current_texture := wgpu.SurfaceGetCurrentTexture(renderer.surface)
+
 	texture_view := wgpu.TextureCreateView(
-		wgpu.SurfaceGetCurrentTexture(renderer.surface).texture,
+		current_texture.texture,
 		&wgpu.TextureViewDescriptor {
-			format = .BGRA8Unorm,
+			format = wgpu.TextureGetFormat(current_texture.texture),
 			aspect = .All,
 			dimension = ._2D,
 			mipLevelCount = 1,
@@ -95,6 +107,17 @@ start_drawing :: proc() {
 	}
 }
 
+draw :: proc() {
+	draw_ctx, ok := &renderer.draw_ctx.?
+	if !ok {
+		panic("Drawing without starting")
+	}
+
+	wgpu.RenderPassEncoderSetPipeline(draw_ctx.render_pass_encoder, renderer.render_pipeline)
+
+	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 3, 1, 0, 0)
+}
+
 finish_drawing :: proc() {
 	draw_ctx, ok := &renderer.draw_ctx.?
 	if !ok {
@@ -119,10 +142,72 @@ finish_drawing :: proc() {
 }
 
 destroy :: proc() {
+	wgpu.RenderPipelineRelease(renderer.render_pipeline)
 	wgpu.SurfaceUnconfigure(renderer.surface)
 	wgpu.QueueRelease(renderer.queue)
 	wgpu.DeviceRelease(renderer.device)
 	wgpu.SurfaceRelease(renderer.surface)
+}
+
+@(private = "file")
+// TODO: prepare_model?
+create_render_pipeline :: proc() -> wgpu.RenderPipeline {
+	shader_path := "src/app/shaders/shader.wgsl"
+
+	shader_source_bytes, ok := os.read_entire_file(shader_path)
+	if !ok {
+		fmt.panicf("Failed to read file at %", shader_path)
+	}
+
+	shader_source := strings.clone_to_cstring(string(shader_source_bytes))
+	delete(shader_source_bytes)
+	defer delete(shader_source)
+
+	shader_module := wgpu.DeviceCreateShaderModule(
+		renderer.device,
+		&wgpu.ShaderModuleDescriptor {
+			nextInChain = &wgpu.ShaderModuleWGSLDescriptor {
+				sType = .ShaderModuleWGSLDescriptor,
+				code = shader_source,
+			},
+		},
+	)
+	defer wgpu.ShaderModuleRelease(shader_module)
+
+	return wgpu.DeviceCreateRenderPipeline(
+		renderer.device,
+		&wgpu.RenderPipelineDescriptor {
+			vertex = wgpu.VertexState{module = shader_module, entryPoint = "vsMain"},
+			primitive = wgpu.PrimitiveState {
+				topology = .TriangleList,
+				cullMode = .None,
+				frontFace = .CCW,
+				stripIndexFormat = .Undefined,
+			},
+			fragment = &wgpu.FragmentState {
+				module = shader_module,
+				entryPoint = "fsMain",
+				targetCount = 1,
+				targets = &wgpu.ColorTargetState {
+					format = renderer.texture_format,
+					writeMask = wgpu.ColorWriteMaskFlags_All,
+					blend = &wgpu.BlendState {
+						color = wgpu.BlendComponent {
+							srcFactor = .SrcAlpha,
+							dstFactor = .OneMinusSrcAlpha,
+							operation = .Add,
+						},
+						alpha = wgpu.BlendComponent {
+							srcFactor = .Zero,
+							dstFactor = .One,
+							operation = .Add,
+						},
+					},
+				},
+			},
+			multisample = wgpu.MultisampleState{count = 1, mask = ~u32(0)},
+		},
+	)
 }
 
 @(private = "file")
