@@ -69,7 +69,7 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 		renderer.device,
 		renderer.queue,
 		"src/app/textures/test_texture.png",
-		renderer.texture_format,
+		.RGBA8Unorm,
 	)
 
 	// Render Pipeline

@@ -2,7 +2,7 @@ package sam_renderer_texture
 
 import "core:fmt"
 import img "core:image"
-@(require) import "core:image/png"
+import "core:image/png"
 import "core:slice"
 import "vendor:wgpu"
 
@@ -74,18 +74,18 @@ create :: proc(
 	return Texture{texture = texture, sampler = sampler}
 }
 
+destroy :: proc(texture: Texture) {
+	wgpu.TextureRelease(texture.texture)
+	wgpu.SamplerRelease(texture.sampler)
+}
+
 @(private)
 load_image :: proc(path: string) -> ^img.Image {
-	image, error := img.load_from_file(path)
+	image, error := png.load_from_file(path)
 
 	if error != nil {
 		fmt.panicf("Failed to load image at: %", path)
 	}
 
 	return image
-}
-
-destroy :: proc(texture: Texture) {
-	wgpu.TextureRelease(texture.texture)
-	wgpu.SamplerRelease(texture.sampler)
 }
