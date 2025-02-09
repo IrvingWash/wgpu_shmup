@@ -7,21 +7,24 @@ import "core:os"
 import "core:slice"
 import "core:strings"
 import "geometry"
+import "texture"
 import "vendor:wgpu"
 import "vendor:wgpu/glfwglue"
 
 @(private)
 Renderer :: struct {
-	surface:           wgpu.Surface,
-	clear_color:       wgpu.Color,
-	device:            wgpu.Device,
-	queue:             wgpu.Queue,
-	texture_format:    wgpu.TextureFormat,
-	render_pipeline:   wgpu.RenderPipeline,
-	draw_ctx:          Maybe(Draw_Context),
-	positions_buffer:  wgpu.Buffer,
-	colors_buffer:     wgpu.Buffer,
-	tex_coords_buffer: wgpu.Buffer,
+	surface:            wgpu.Surface,
+	clear_color:        wgpu.Color,
+	device:             wgpu.Device,
+	queue:              wgpu.Queue,
+	texture_format:     wgpu.TextureFormat,
+	render_pipeline:    wgpu.RenderPipeline,
+	draw_ctx:           Maybe(Draw_Context),
+	positions_buffer:   wgpu.Buffer,
+	colors_buffer:      wgpu.Buffer,
+	tex_coords_buffer:  wgpu.Buffer,
+	texture_bind_group: wgpu.BindGroup,
+	test_texture:       texture.Texture,
 }
 
 @(private = "file")
@@ -60,6 +63,14 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 	configure_surface(window_size.width, window_size.height)
 
 	window.set_resize_callback(resize)
+
+	// Texture
+	renderer.test_texture = texture.create(
+		renderer.device,
+		renderer.queue,
+		"src/app/textures/test_texture.png",
+		renderer.texture_format,
+	)
 
 	// Render Pipeline
 	renderer.render_pipeline = create_render_pipeline()
@@ -129,6 +140,18 @@ draw :: proc() {
 		0,
 		wgpu.BufferGetSize(renderer.colors_buffer),
 	)
+	wgpu.RenderPassEncoderSetVertexBuffer(
+		draw_ctx.render_pass_encoder,
+		2,
+		renderer.tex_coords_buffer,
+		0,
+		wgpu.BufferGetSize(renderer.tex_coords_buffer),
+	)
+	wgpu.RenderPassEncoderSetBindGroup(
+		draw_ctx.render_pass_encoder,
+		0,
+		renderer.texture_bind_group,
+	)
 
 	wgpu.RenderPassEncoderDraw(draw_ctx.render_pass_encoder, 6, 1, 0, 0)
 }
@@ -157,6 +180,11 @@ finish_drawing :: proc() {
 }
 
 destroy :: proc() {
+	texture.destroy(renderer.test_texture)
+	wgpu.BindGroupRelease(renderer.texture_bind_group)
+	wgpu.BufferRelease(renderer.tex_coords_buffer)
+	wgpu.BufferRelease(renderer.colors_buffer)
+	wgpu.BufferRelease(renderer.positions_buffer)
 	wgpu.RenderPipelineRelease(renderer.render_pipeline)
 	wgpu.SurfaceUnconfigure(renderer.surface)
 	wgpu.QueueRelease(renderer.queue)
@@ -206,7 +234,7 @@ resize :: proc "c" (window: window.Window, width: i32, height: i32) {
 @(private = "file")
 // TODO: prepare_model?
 create_render_pipeline :: proc() -> wgpu.RenderPipeline {
-	shader_path := "src/app/shaders/shader.wgsl"
+	shader_path := "src/app/renderer/shaders/shader.wgsl"
 
 	shader_source_bytes, ok := os.read_entire_file(shader_path)
 	if !ok {
@@ -229,6 +257,7 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	defer wgpu.ShaderModuleRelease(shader_module)
 
 	buffer_layouts := [?]wgpu.VertexBufferLayout {
+		// Positions
 		wgpu.VertexBufferLayout {
 			arrayStride = 2 * size_of(f32),
 			stepMode = .Vertex,
@@ -239,6 +268,7 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 				shaderLocation = 0,
 			},
 		},
+		// Colors
 		wgpu.VertexBufferLayout {
 			arrayStride = 3 * size_of(f32),
 			stepMode = .Vertex,
@@ -249,7 +279,70 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 				shaderLocation = 1,
 			},
 		},
+		// Texture coordinates
+		wgpu.VertexBufferLayout {
+			arrayStride = 2 * size_of(f32),
+			stepMode = .Vertex,
+			attributeCount = 1,
+			attributes = &wgpu.VertexAttribute {
+				format = .Float32x2,
+				offset = 0,
+				shaderLocation = 2,
+			},
+		},
 	}
+
+	texture_bind_group_layout_entries := [?]wgpu.BindGroupLayoutEntry {
+		wgpu.BindGroupLayoutEntry {
+			binding = 0,
+			visibility = {.Fragment},
+			sampler = wgpu.SamplerBindingLayout{type = .Filtering},
+		},
+		wgpu.BindGroupLayoutEntry {
+			binding = 1,
+			visibility = {.Fragment},
+			texture = wgpu.TextureBindingLayout {
+				sampleType = .Float,
+				multisampled = false,
+				viewDimension = ._2D,
+			},
+		},
+	}
+
+	texture_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
+		renderer.device,
+		&wgpu.BindGroupLayoutDescriptor {
+			entryCount = len(texture_bind_group_layout_entries),
+			entries = raw_data(texture_bind_group_layout_entries[:]),
+		},
+	)
+	defer wgpu.BindGroupLayoutRelease(texture_bind_group_layout)
+
+	texture_bind_group_entries := [?]wgpu.BindGroupEntry {
+		wgpu.BindGroupEntry{binding = 0, sampler = renderer.test_texture.sampler},
+		wgpu.BindGroupEntry {
+			binding     = 1,
+			textureView = wgpu.TextureCreateView(renderer.test_texture.texture), // TODO: Release
+		},
+	}
+
+	renderer.texture_bind_group = wgpu.DeviceCreateBindGroup(
+		renderer.device,
+		&wgpu.BindGroupDescriptor {
+			layout = texture_bind_group_layout,
+			entryCount = len(texture_bind_group_entries),
+			entries = raw_data(texture_bind_group_entries[:]),
+		},
+	)
+
+	pipeline_layout := wgpu.DeviceCreatePipelineLayout(
+		renderer.device,
+		&wgpu.PipelineLayoutDescriptor {
+			bindGroupLayoutCount = 1,
+			bindGroupLayouts = &texture_bind_group_layout,
+		},
+	)
+	defer wgpu.PipelineLayoutRelease(pipeline_layout)
 
 	return wgpu.DeviceCreateRenderPipeline(
 		renderer.device,
@@ -262,7 +355,7 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 			},
 			primitive = wgpu.PrimitiveState {
 				topology = .TriangleList,
-				cullMode = .Back,
+				cullMode = .None,
 				frontFace = .CCW,
 				stripIndexFormat = .Undefined,
 			},
@@ -288,6 +381,7 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 				},
 			},
 			multisample = wgpu.MultisampleState{count = 1, mask = ~u32(0)},
+			layout = pipeline_layout,
 		},
 	)
 }
@@ -365,4 +459,3 @@ request_device :: proc(adapter: wgpu.Adapter) -> wgpu.Device {
 
 	return out.device
 }
-
