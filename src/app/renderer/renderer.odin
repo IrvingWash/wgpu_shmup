@@ -54,6 +54,7 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 }
 
 start_drawing :: proc() {}
+
 finish_drawing :: proc() {}
 
 destroy :: proc() {
@@ -76,7 +77,11 @@ request_adapter :: proc(instance: wgpu.Instance) -> wgpu.Adapter {
 
 	wgpu.InstanceRequestAdapter(
 		instance,
-		&wgpu.RequestAdapterOptions{compatibleSurface = renderer.surface},
+		&wgpu.RequestAdapterOptions {
+			compatibleSurface = renderer.surface,
+			powerPreference = .HighPerformance,
+			forceFallbackAdapter = false,
+		},
 		proc "c" (
 			status: wgpu.RequestAdapterStatus,
 			adapter: wgpu.Adapter,
