@@ -4,6 +4,9 @@ struct VertexOut {
 	@location(1) texCoords: vec2f,
 }
 
+@group(0) @binding(0)
+var<uniform> projectionViewMatrix: mat4x4f;
+
 @vertex
 fn vsMain(
 	@location(0) position: vec2f,
@@ -12,16 +15,16 @@ fn vsMain(
 ) -> VertexOut {
 	var out: VertexOut;
 
-	out.position = vec4f(position, 0, 1);
+	out.position = projectionViewMatrix * vec4f(position, 0, 1);
 	out.color = vec4f(color, 1);
 	out.texCoords = texCoords;
 
 	return out;
 }
 
-@group(0) @binding(0)
+@group(1) @binding(0)
 var textureSampler: sampler;
-@group(0) @binding(1)
+@group(1) @binding(1)
 var texture: texture_2d<f32>;
 
 @fragment

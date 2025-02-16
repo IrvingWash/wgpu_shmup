@@ -1,6 +1,8 @@
 package sam_renderer
 
 import "../window"
+import "camera"
+import "core:math/linalg"
 import "geometry"
 import "texture"
 import "vendor:wgpu"
@@ -8,17 +10,20 @@ import "vendor:wgpu/glfwglue"
 
 @(private)
 Renderer :: struct {
-	surface:            wgpu.Surface,
-	clear_color:        wgpu.Color,
-	device:             wgpu.Device,
-	queue:              wgpu.Queue,
-	texture_format:     wgpu.TextureFormat,
-	render_pipeline:    wgpu.RenderPipeline,
-	draw_ctx:           Maybe(Draw_Context),
-	vertex_buffer:      wgpu.Buffer,
-	index_buffer:       wgpu.Buffer,
-	texture_bind_group: wgpu.BindGroup,
-	test_texture:       texture.Texture,
+	surface:                           wgpu.Surface,
+	clear_color:                       wgpu.Color,
+	device:                            wgpu.Device,
+	queue:                             wgpu.Queue,
+	texture_format:                    wgpu.TextureFormat,
+	render_pipeline:                   wgpu.RenderPipeline,
+	draw_ctx:                          Maybe(Draw_Context),
+	vertex_buffer:                     wgpu.Buffer,
+	index_buffer:                      wgpu.Buffer,
+	projection_view_matrix_buffer:     wgpu.Buffer,
+	texture_bind_group:                wgpu.BindGroup,
+	proejection_view_matrix_bind_grup: wgpu.BindGroup,
+	test_texture:                      texture.Texture,
+	camera:                            camera.Camera,
 }
 
 @(private)
@@ -66,14 +71,20 @@ init :: proc(target_window: window.Window, clear_color := [4]f64{0, 0, 1, 1}) {
 		.RGBA8Unorm,
 	)
 
-	// Render Pipeline
-	renderer.render_pipeline = create_render_pipeline()
+	// Camera
+	renderer.camera = camera.create_camera(window_size.width, window_size.height)
+	projection_view_matrix_data := linalg.matrix_flatten(renderer.camera.projectionViewMatrix)
 
 	// Geometry
 	quad := geometry.create_quad()
 
+	// Buffers
 	renderer.vertex_buffer = create_buffer(quad.vertices[:])
 	renderer.index_buffer = create_index_buffer(quad.indices[:])
+	renderer.projection_view_matrix_buffer = create_uniform_buffer(projection_view_matrix_data[:])
+
+	// Render Pipeline
+	renderer.render_pipeline = create_render_pipeline()
 }
 
 start_drawing :: proc() {
@@ -129,6 +140,11 @@ draw :: proc() {
 	wgpu.RenderPassEncoderSetBindGroup(
 		draw_ctx.render_pass_encoder,
 		0,
+		renderer.proejection_view_matrix_bind_grup,
+	)
+	wgpu.RenderPassEncoderSetBindGroup(
+		draw_ctx.render_pass_encoder,
+		1,
 		renderer.texture_bind_group,
 	)
 	wgpu.RenderPassEncoderSetIndexBuffer(
@@ -166,6 +182,8 @@ finish_drawing :: proc() {
 }
 
 destroy :: proc() {
+	wgpu.BufferRelease(renderer.projection_view_matrix_buffer)
+	wgpu.BindGroupRelease(renderer.proejection_view_matrix_bind_grup)
 	texture.destroy(renderer.test_texture)
 	wgpu.BindGroupRelease(renderer.texture_bind_group)
 	wgpu.BufferRelease(renderer.vertex_buffer)
@@ -175,3 +193,4 @@ destroy :: proc() {
 	wgpu.DeviceRelease(renderer.device)
 	wgpu.SurfaceRelease(renderer.surface)
 }
+

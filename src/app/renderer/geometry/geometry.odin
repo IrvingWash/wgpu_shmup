@@ -7,14 +7,19 @@ Quad_Geometry :: struct {
 
 create_quad :: proc() -> Quad_Geometry {
 	quad: Quad_Geometry
+
+	x :: 100
+	y :: 100
+	w :: 112
+	h :: 75
 	
 	// odinfmt: disable
 	quad.vertices = {
 		// x, y,		r, g, b,	u, v
-		-0.1, -0.1,		1, 1, 1,	0, 1,
-		+0.1, -0.1,		1, 1, 1,	1, 1,
-		+0.1, +0.1,		1, 1, 1,	1, 0,
-		-0.1, +0.1,		1, 1, 1,	0, 0,
+		x, y + h,		1, 1, 1,	0, 1,
+		x + w, y + h,	1, 1, 1,	1, 1,
+		x + w, y,		1, 1, 1,	1, 0,
+		x, y,   		1, 1, 1,	0, 0,
 	}
 	// odinfmt: enable
 
@@ -28,3 +33,4 @@ create_quad :: proc() -> Quad_Geometry {
 
 	return quad
 }
+

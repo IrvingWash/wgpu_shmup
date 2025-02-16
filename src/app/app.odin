@@ -11,8 +11,8 @@ App :: struct {}
 app: App
 
 init :: proc() {
-	window.init(WINDOW_WIDTH, WINDOW_HEIGHT, "Sam")
-	renderer.init(window.get_window(), {0.9, 0.9, 0.9, 1})
+	window.init(WINDOW_WIDTH, WINDOW_HEIGHT, "Sam", true)
+	renderer.init(window.get_window(), {0.5, 0.5, 0.5, 1})
 	fps_manager.init(TARGET_FPS)
 }
 
@@ -32,3 +32,4 @@ destroy :: proc() {
 	renderer.destroy()
 	window.destroy()
 }
+

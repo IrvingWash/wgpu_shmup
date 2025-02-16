@@ -49,6 +49,24 @@ create_index_buffer :: proc(data: []u16) -> wgpu.Buffer {
 }
 
 @(private)
+create_uniform_buffer :: proc(data: []f32) -> wgpu.Buffer {
+	buffer := wgpu.DeviceCreateBuffer(
+		renderer.device,
+		&wgpu.BufferDescriptor{size = u64(slice.size(data[:])), usage = {.CopyDst, .Uniform}},
+	)
+
+	wgpu.QueueWriteBuffer(
+		renderer.queue,
+		buffer,
+		0,
+		raw_data(data),
+		uint(wgpu.BufferGetSize(buffer)),
+	)
+
+	return buffer
+}
+
+@(private)
 // TODO: prepare_model?
 create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 	shader_path := "src/app/renderer/shaders/shader.wgsl"
@@ -118,11 +136,47 @@ create_render_pipeline :: proc() -> wgpu.RenderPipeline {
 		},
 	)
 
+	projection_view_matrix_bind_group_layout := wgpu.DeviceCreateBindGroupLayout(
+		renderer.device,
+		&wgpu.BindGroupLayoutDescriptor {
+			entryCount = 1,
+			entries = &wgpu.BindGroupLayoutEntry {
+				binding = 0,
+				visibility = {.Vertex},
+				buffer = wgpu.BufferBindingLayout {
+					type = .Uniform,
+					hasDynamicOffset = false,
+					minBindingSize = size_of(f32) * 16,
+				},
+			},
+		},
+	)
+	defer wgpu.BindGroupLayoutRelease(projection_view_matrix_bind_group_layout)
+
+	renderer.proejection_view_matrix_bind_grup = wgpu.DeviceCreateBindGroup(
+		renderer.device,
+		&wgpu.BindGroupDescriptor {
+			layout = projection_view_matrix_bind_group_layout,
+			entryCount = 1,
+			entries = &wgpu.BindGroupEntry {
+				binding = 0,
+				buffer = renderer.projection_view_matrix_buffer,
+				offset = 0,
+				size = wgpu.BufferGetSize(renderer.projection_view_matrix_buffer),
+			},
+		},
+	)
+
+	bind_group_layouts := [?]wgpu.BindGroupLayout {
+		projection_view_matrix_bind_group_layout,
+		texture_bind_group_layout,
+	}
+
 	pipeline_layout := wgpu.DeviceCreatePipelineLayout(
 		renderer.device,
 		&wgpu.PipelineLayoutDescriptor {
-			bindGroupLayoutCount = 1,
-			bindGroupLayouts = &texture_bind_group_layout,
+			bindGroupLayoutCount = len(bind_group_layouts),
+			bindGroupLayouts = raw_data(bind_group_layouts[:]),
 		},
 	)
 	defer wgpu.PipelineLayoutRelease(pipeline_layout)
